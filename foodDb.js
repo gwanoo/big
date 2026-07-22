@@ -144,8 +144,7 @@ meatShopNames.forEach(shop => {
         Math.round(cal * ratio),
         Math.round(carb * ratio * 10) / 10,
         Math.round(prot * ratio * 10) / 10,
-        Math.round(fat * ratio * 10) / 10,
-        "인분" if "인분" in portName else "g", 1 if "인분" in portName else 100, "restaurant"
+        portName.includes("인분") ? "인분" : "g", portName.includes("인분") ? 1 : 100, "restaurant"
       ]);
     });
   });
@@ -365,9 +364,8 @@ byproductShops.forEach(shop => {
   byproductItems.forEach(([item, cal, carb, prot, fat]) => {
     FOODS_ARRAY.push([
       `${shop} ${item}`,
-      cal, carb, prot, fat,
-      "g" if "100g" in item else "인분",
-      100 if "100g" in item else 1, "restaurant"
+      item.includes("100g") ? "g" : "인분",
+      item.includes("100g") ? 100 : 1, "restaurant"
     ]);
   });
 });
