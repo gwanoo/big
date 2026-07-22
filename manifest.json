@@ -1,0 +1,18 @@
+{
+  "name": "Lean Mass Up Tracker",
+  "short_name": "LMU Tracker",
+  "description": "8.1 헬스 재개 및 린매스업 목표 달성을 위한 식단 & 운동 기록기",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0a0b0e",
+  "theme_color": "#14161d",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.jpg",
+      "sizes": "192x192 512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

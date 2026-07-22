@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lean Mass Up Tracker - 린매스업 식단 & 운동 기록기</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#14161d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icon.jpg">
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <span class="logo-icon">⚡</span>
+      <span>Lean Mass Up Tracker</span>
+    </div>
+    <nav>
+      <button class="nav-btn active" onclick="switchTab('dashboard')">대시보드</button>
+      <button class="nav-btn" onclick="switchTab('diet')">식단 기록</button>
+      <button class="nav-btn" onclick="switchTab('workout')">운동 기록</button>
+      <button class="nav-btn" onclick="switchTab('settings')">설정 & 가이드</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- 공통 날짜 선택기 -->
+    <div class="date-selector">
+      <label for="current-date" style="margin-bottom: 0; margin-right: 0.5rem;">선택 날짜:</label>
+      <input type="date" id="current-date">
+    </div>
+
+    <!-- 1. 대시보드 탭 -->
+    <section id="dashboard" class="tab-content active">
+      <div class="alert-box">
+        <span class="alert-box-icon">💡</span>
+        <div>
+          <strong>린매스업 성공 팁:</strong> 체지방을 줄이면서 근육량을 늘리기 위해서는 일일 소비 대사량(TDEE) 부근 또는 +150~300kcal 수준의 칼로리를 섭취하고, 체중 1kg당 1.6g~2.2g의 단백질 섭취를 유지해야 합니다.
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <!-- 식단 요약 카드 -->
+        <div class="card">
+          <div class="card-title">
+            <span>오늘의 영양 섭취 현황</span>
+            <span style="font-size: 0.85rem; color: var(--color-text-muted);" id="cal-ratio-text">0 / 2500 kcal (0%)</span>
+          </div>
+          
+          <div class="progress-container">
+            <div class="progress-label">
+              <span>총 칼로리</span>
+              <span id="progress-cal-val">0 / 2500 kcal</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="progress-cal-bar" class="progress-bar-fill fill-cal"></div>
+            </div>
+          </div>
+
+          <div class="progress-container">
+            <div class="progress-label">
+              <span>탄수화물 (Carbs)</span>
+              <span id="progress-carb-val">0g / 300g</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="progress-carb-bar" class="progress-bar-fill fill-carb"></div>
+            </div>
+          </div>
+
+          <div class="progress-container">
+            <div class="progress-label">
+              <span>단백질 (Protein)</span>
+              <span id="progress-protein-val">0g / 150g</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="progress-protein-bar" class="progress-bar-fill fill-protein"></div>
+            </div>
+          </div>
+
+          <div class="progress-container">
+            <div class="progress-label">
+              <span>지방 (Fat)</span>
+              <span id="progress-fat-val">0g / 60g</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="progress-fat-bar" class="progress-bar-fill fill-fat"></div>
+            </div>
+          </div>
+
+          <div class="macro-grid">
+            <div class="macro-box">
+              <div style="font-size: 0.8rem; color: var(--color-text-muted);">탄수화물 섭취</div>
+              <div class="macro-val" id="macro-carb">0 g</div>
+            </div>
+            <div class="macro-box" style="border-color: rgba(255, 45, 85, 0.3);">
+              <div style="font-size: 0.8rem; color: var(--color-text-muted);">단백질 섭취</div>
+              <div class="macro-val" id="macro-protein" style="color: #ff2d55;">0 g</div>
+            </div>
+            <div class="macro-box">
+              <div style="font-size: 0.8rem; color: var(--color-text-muted);">지방 섭취</div>
+              <div class="macro-val" id="macro-fat">0 g</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 오늘 운동 요약 카드 -->
+        <div class="card">
+          <div class="card-title">
+            <span>오늘의 운동 진행 현황</span>
+            <span id="today-workout-split" class="badge" style="font-size: 0.85rem; color: var(--color-primary); font-weight: 700;">미등록</span>
+          </div>
+
+          <div id="today-workout-empty" style="text-align: center; padding: 3rem 0; color: var(--color-text-muted);">
+            <div style="font-size: 2.5rem; margin-bottom: 1rem;">🏋️‍♂️</div>
+            <p>오늘 기록된 운동이 없습니다.</p>
+            <p style="font-size: 0.8rem; margin-top: 0.5rem;">운동 기록 탭에서 추천 루틴을 시작해 보세요!</p>
+          </div>
+
+          <div id="today-workout-summary" style="display: none;">
+            <div style="margin-bottom: 1.5rem;">
+              <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem;">기록된 세트 요약</h3>
+              <p style="color: var(--color-text-muted); font-size: 0.9rem;" id="workout-summary-stats">총 0개 종목 / 0개 세트 완료</p>
+            </div>
+            
+            <ul id="today-workout-list" class="log-list">
+              <!-- JS로 주입 -->
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. 식단 기록 탭 -->
+    <section id="diet" class="tab-content">
+      <div class="dashboard-grid">
+        <!-- 식단 추가 양식 -->
+        <div class="card">
+          <div class="card-title">식사 기입</div>
+          
+          <!-- 검색 입력 -->
+          <div class="form-group autocomplete-container">
+            <label for="food-search">식품 검색 (피트니스 식단, 편의점 제품, 일반 외식, 프랜차이즈)</label>
+            <input type="text" id="food-search" placeholder="예: 닭가슴살, 삼각김밥, 짬뽕, 서브웨이 등..." autocomplete="off">
+            <div id="autocomplete-list" class="autocomplete-list" style="display: none;"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="food-category-select">식사 구분</label>
+              <select id="food-category-select">
+                <option value="아침">아침</option>
+                <option value="점심">점심</option>
+                <option value="저녁">저녁</option>
+                <option value="간식">간식</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="food-amount">섭취량</label>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="number" id="food-amount" value="100" min="1" style="flex: 1;">
+                <span id="food-unit" style="font-weight: 500;">g</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="text-align: right; margin-bottom: 1.5rem;">
+            <button class="btn" onclick="addSelectedFood()">식사에 추가 ⚡</button>
+          </div>
+
+          <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+            <h4 style="margin-bottom: 1rem; font-size: 0.95rem; color: var(--color-text-muted);">직접 영양성분 입력하기</h4>
+            <div class="form-group">
+              <label for="custom-food-name">음식 이름</label>
+              <input type="text" id="custom-food-name" placeholder="직접 입력할 음식명">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="custom-calories">칼로리 (kcal)</label>
+                <input type="number" id="custom-calories" placeholder="0" min="0">
+              </div>
+              <div class="form-group">
+                <label for="custom-carbs">탄수화물 (g)</label>
+                <input type="number" id="custom-carbs" placeholder="0" min="0">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="custom-protein">단백질 (g)</label>
+                <input type="number" id="custom-protein" placeholder="0" min="0">
+              </div>
+              <div class="form-group">
+                <label for="custom-fat">지방 (g)</label>
+                <input type="number" id="custom-fat" placeholder="0" min="0">
+              </div>
+            </div>
+            <button class="btn btn-secondary" style="width: 100%;" onclick="addCustomFood()">직접 입력 식품 추가</button>
+          </div>
+        </div>
+
+        <!-- 식단 로그 리스트 -->
+        <div class="card">
+          <div class="card-title">오늘 먹은 식단 목록</div>
+          
+          <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <div>
+              <h3 style="font-size: 1rem; color: var(--color-secondary); border-left: 3px solid var(--color-secondary); padding-left: 0.5rem; margin-bottom: 0.8rem;">아침 (Breakfast)</h3>
+              <ul id="breakfast-list" class="log-list"><li style="color: var(--color-text-muted); font-size: 0.85rem; padding: 0.5rem 0;">기록 없음</li></ul>
+            </div>
+            <div>
+              <h3 style="font-size: 1rem; color: var(--color-secondary); border-left: 3px solid var(--color-secondary); padding-left: 0.5rem; margin-bottom: 0.8rem;">점심 (Lunch)</h3>
+              <ul id="lunch-list" class="log-list"><li style="color: var(--color-text-muted); font-size: 0.85rem; padding: 0.5rem 0;">기록 없음</li></ul>
+            </div>
+            <div>
+              <h3 style="font-size: 1rem; color: var(--color-secondary); border-left: 3px solid var(--color-secondary); padding-left: 0.5rem; margin-bottom: 0.8rem;">저녁 (Dinner)</h3>
+              <ul id="dinner-list" class="log-list"><li style="color: var(--color-text-muted); font-size: 0.85rem; padding: 0.5rem 0;">기록 없음</li></ul>
+            </div>
+            <div>
+              <h3 style="font-size: 1rem; color: var(--color-secondary); border-left: 3px solid var(--color-secondary); padding-left: 0.5rem; margin-bottom: 0.8rem;">간식 (Snack)</h3>
+              <ul id="snack-list" class="log-list"><li style="color: var(--color-text-muted); font-size: 0.85rem; padding: 0.5rem 0;">기록 없음</li></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. 운동 기록 탭 -->
+    <section id="workout" class="tab-content">
+      <!-- 3분할 선택 카드 카드 -->
+      <div class="card" style="margin-bottom: 2rem;">
+        <div class="card-title">오늘의 운동 분할 선택</div>
+        <div class="workout-split-container">
+          <div class="workout-card" id="split-chest-triceps" onclick="selectSplit('chest-triceps')">
+            <h3>🔥 Day 1: 가슴 & 삼두</h3>
+            <p>미는 근육 사슬 활성화. 린매스업을 위해 가슴 상/중부와 삼두의 점진적 과부하를 타겟팅합니다.</p>
+          </div>
+          <div class="workout-card" id="split-back-biceps" onclick="selectSplit('back-biceps')">
+            <h3>💪 Day 2: 등 & 이두</h3>
+            <p>당기는 근육 사슬 활성화. 넓은 프레임을 위한 광배근 및 대원근과 이두근 고립 운동 추천.</p>
+          </div>
+          <div class="workout-card" id="split-legs-shoulders" onclick="selectSplit('legs-shoulders')">
+            <h3>🏋️‍♂️ Day 3: 하체 & 어깨</h3>
+            <p>성장 호르몬 분비를 촉진하는 대근육 하체 훈련과 입체적인 프레임을 완성하는 어깨 훈련.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="workout-log-section">
+        <!-- 추천 운동 리스트 -->
+        <div class="card">
+          <div class="card-title">린매스업 추천 운동</div>
+          <div id="split-recommendations-empty" style="text-align: center; color: var(--color-text-muted); padding: 2rem 0;">
+            <p>위에서 오늘 진행할 운동 분할을 선택하시면,</p>
+            <p style="font-weight: 600; color: var(--color-secondary); margin-top: 0.5rem;">린매스업 맞춤 추천 운동 목록이 나타납니다.</p>
+          </div>
+          <div id="split-recommendations-content" style="display: none;">
+            <div class="alert-box" style="margin-bottom: 1rem; padding: 0.8rem;">
+              <span class="alert-box-icon">💡</span>
+              <div style="font-size: 0.8rem;">
+                추천 운동 우측의 <strong>[+]</strong> 버튼을 누르면 오늘의 운동 기록장에 즉시 추가됩니다.
+              </div>
+            </div>
+            <div class="recommendation-list" id="recommendation-items">
+              <!-- JS로 추천 운동 주입 -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 운동 기록하기 -->
+        <div class="card">
+          <div class="card-title">오늘의 운동 기록장</div>
+          
+          <!-- 새로운 운동 추가 폼 -->
+          <div class="form-row" style="margin-bottom: 1rem; align-items: flex-end;">
+            <div class="form-group" style="flex: 2;">
+              <label for="workout-name-input">운동 종목 입력</label>
+              <input type="text" id="workout-name-input" placeholder="예: 벤치 프레스, 데드리프트 등">
+            </div>
+            <div style="margin-bottom: 1.2rem;">
+              <button class="btn" onclick="addNewWorkoutItem()">운동 추가</button>
+            </div>
+          </div>
+
+          <div id="workout-list-empty" style="text-align: center; padding: 3rem 0; color: var(--color-text-muted);">
+            <p>오늘 등록한 운동 종목이 없습니다.</p>
+            <p style="font-size: 0.85rem; margin-top: 0.5rem;">추천 운동을 선택하거나 직접 입력하여 세트를 기록해 보세요.</p>
+          </div>
+
+          <div id="logged-workouts-container" style="display: none; display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- JS로 운동 항목과 세트 입력 테이블 주입 -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 설정 & 가이드 탭 -->
+    <section id="settings" class="tab-content">
+      <div class="settings-grid">
+        <!-- 사용자 신체정보 및 목표 설정 -->
+        <div class="card">
+          <div class="card-title">내 정보 및 목표 칼로리 설정</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="user-weight">현재 체중 (kg)</label>
+              <input type="number" id="user-weight" value="70" min="30" max="200" onchange="calculateRecommendedMacros()">
+            </div>
+            <div class="form-group">
+              <label for="user-activity">활동량 수준</label>
+              <select id="user-activity" onchange="calculateRecommendedMacros()">
+                <option value="1.2">거의 활동 없음 (사무직)</option>
+                <option value="1.375" selected>가벼운 활동 (주 1~3회 운동)</option>
+                <option value="1.55">보통 활동 (주 3~5회 운동)</option>
+                <option value="1.725">적극적 활동 (주 6~7회 강한 운동)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="alert-box" style="margin-bottom: 1.5rem;">
+            <span class="alert-box-icon">📊</span>
+            <div>
+              <strong>린매스업 권장 수치 (가이드):</strong><br>
+              - 목표 칼로리: <span id="guide-cal" style="color: var(--color-secondary); font-weight: 700;">2200 kcal</span> (TDEE + 약 150kcal)<br>
+              - 탄수화물: <span id="guide-carb">275 g</span> (칼로리의 50%)<br>
+              - 단백질: <span id="guide-protein" style="color: var(--color-primary); font-weight: 700;">140 g</span> (체중 x 2.0g)<br>
+              - 지방: <span id="guide-fat">54 g</span> (칼로리의 22%)
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+            <h4 style="margin-bottom: 1rem;">목표 칼로리 & 탄단지 직접 지정</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="target-calories">목표 칼로리 (kcal)</label>
+                <input type="number" id="target-calories" value="2300">
+              </div>
+              <div class="form-group">
+                <label for="target-carbs">목표 탄수화물 (g)</label>
+                <input type="number" id="target-carbs" value="280">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="target-protein">목표 단백질 (g)</label>
+                <input type="number" id="target-protein" value="140">
+              </div>
+              <div class="form-group">
+                <label for="target-fat">목표 지방 (g)</label>
+                <input type="number" id="target-fat" value="60">
+              </div>
+            </div>
+            <button class="btn" style="width: 100%;" onclick="saveTargetSettings()">설정 적용하기 💾</button>
+          </div>
+          
+          <div style="border-top: 1px solid var(--border-color); padding-top: 1.5rem; margin-top: 1.5rem;">
+            <h4 style="margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.3rem;">
+              <span>🔑</span> 식약처 API 연동 (모든 음식 검색)
+            </h4>
+            <p style="font-size: 0.75rem; color: var(--color-text-muted); margin-bottom: 1rem; line-height: 1.5;">
+              식약처 공공 API를 활용하여 수만 개의 가공식품, 프랜차이즈, 국밥/짬뽕 등 외식 정보를 검색합니다.<br>
+              1. <a href="https://www.foodsafetykorea.go.kr/api/openApiInfo.do" target="_blank" style="color: var(--color-secondary); text-decoration: underline; font-weight: 500;">식품안전나라 오픈API (여기 클릭)</a>에서 무료 회원가입 후 인증키를 즉시 발급받으세요.<br>
+              2. 발급받은 인증키를 아래에 입력하고 저장해 주시면 즉시 검색에 적용됩니다.
+            </p>
+            <div class="form-group">
+              <label for="api-key-input">식품안전나라 OpenAPI 인증키</label>
+              <input type="text" id="api-key-input" placeholder="예: 42b2ab54b...">
+            </div>
+            <button class="btn btn-secondary" style="width: 100%;" onclick="saveApiKey()">인증키 저장하기 🔑</button>
+          </div>
+        </div>
+
+        <!-- 린매스업 가이드 및 꿀팁 -->
+        <div class="card">
+          <div class="card-title">린매스업(Lean Mass Up) 트레이닝 가이드</div>
+          <div style="font-size: 0.9rem; line-height: 1.6; color: var(--color-text-muted);">
+            <h3 style="color: var(--color-text-main); font-size: 1.05rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.3rem;">
+              <span>📈</span> 점진적 과부하 (Progressive Overload)
+            </h3>
+            <p style="margin-bottom: 1rem;">
+              린매스업을 위해서는 단순히 매일 운동하는 것에 그치지 않고, 지난주보다 무게를 늘리거나(무게 증가), 횟수를 늘리거나(볼륨 증가), 세트 간 휴식 시간을 통제하여 점차 운동의 총 부하를 늘려가야 합니다. 이 프로그램에 기록되는 무게와 횟수를 바탕으로 점진적인 발전을 도모하세요.
+            </p>
+
+            <h3 style="color: var(--color-text-main); font-size: 1.05rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.3rem;">
+              <span>💧</span> 수분 섭취와 염분 조절
+            </h3>
+            <p style="margin-bottom: 1rem;">
+              충분한 수분 섭취는 근육 내 수분 보유량을 늘려 운동 수행 능력을 향상시키고 근육 합성을 지원합니다. 지나친 무염식보다는 적절한 나트륨(염분) 섭취가 땀을 흘린 뒤의 전해질 균형과 근수축에 도움이 됩니다. 편의점 제품이나 일반식(국밥, 짬뽕 등)을 드실 때도 나트륨 과다를 방지하기 위해 국물은 가급적 남기는 식습관을 추천합니다.
+            </p>
+
+            <h3 style="color: var(--color-text-main); font-size: 1.05rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.3rem;">
+              <span>😴</span> 휴식과 동화 작용 (Anabolism)
+            </h3>
+            <p>
+              근육은 운동할 때 자라나는 것이 아니라 휴식하고 영양분을 흡수할 때 합성됩니다. 하루 7~8시간의 양질의 수면을 확보하고, 운동 부위별로 충분히 회복할 시간(3분할 루틴을 통해 최소 48시간 이상 휴식 확보)을 부여해 주세요.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer style="text-align: center; padding: 2rem; color: var(--color-text-muted); font-size: 0.8rem; border-top: 1px solid var(--border-color); background-color: var(--bg-secondary); margin-top: auto;">
+    <p>&copy; 2026 Lean Mass Up Tracker. 8.1 헬스 재개 및 린매스업 완성을 응원합니다!</p>
+  </footer>
+
+  <script src="foodDb.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
