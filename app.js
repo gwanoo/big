@@ -1,13 +1,9 @@
-// 디바운스 타이머 변수 (API 과호출 방지)
-let searchTimeout = null;
-
 // 상태 전역 변수
 let state = {
   currentDate: '',
   userData: {
     weight: 70,
     activity: 1.375,
-    apiKey: '', // 식품안전나라 API 인증키
     targets: {
       calories: 2200,
       carbs: 275,
@@ -104,19 +100,6 @@ function loadLocalStorage() {
   document.getElementById('target-carbs').value = state.userData.targets.carbs;
   document.getElementById('target-protein').value = state.userData.targets.protein;
   document.getElementById('target-fat').value = state.userData.targets.fat;
-  
-  const apiKeyEl = document.getElementById('api-key-input');
-  if (apiKeyEl) apiKeyEl.value = state.userData.apiKey || '';
-}
-
-// 식약처 API 키 저장
-function saveApiKey() {
-  const keyInput = document.getElementById('api-key-input');
-  if (keyInput) {
-    state.userData.apiKey = keyInput.value.trim();
-    saveState();
-    alert('식약처 OpenAPI 인증키가 저장되었습니다. 🔑');
-  }
 }
 
 // LocalStorage에 상태 저장
@@ -320,109 +303,31 @@ function updateDashboard() {
   }
 }
 
-// 2. 식단 검색 및 자동완성 (Debounced & 식약처 OpenAPI 하이브리드 지원)
+// 2. 식단 검색 및 자동완성 (오프라인 전용 고속 매칭)
 function handleFoodSearch(e) {
   const query = e.target.value.toLowerCase().trim();
   const listEl = document.getElementById('autocomplete-list');
-  
-  if (searchTimeout) {
-    clearTimeout(searchTimeout);
-  }
   
   if (!query) {
     listEl.style.display = 'none';
     return;
   }
   
-  // 디바운스 적용: 350ms 대기 후 검색 실행 (서버 부하 및 타이핑 렉 방지)
-  searchTimeout = setTimeout(async () => {
-    // 1단계: 로컬 DB 검색
-    const localMatches = FOOD_DATABASE.filter(food => food.name.toLowerCase().includes(query)).slice(0, 6);
-    
-    let allMatches = [...localMatches];
-    const categoryKo = {
-      fitness: '피트니스',
-      convenience: '편의점',
-      franchise: '프랜차이즈',
-      restaurant: '일반외식',
-      api: '식약처'
-    };
-    
-    // 로컬 검색 결과를 먼저 즉시 렌더링
-    renderAutocomplete(allMatches, listEl, categoryKo);
-    
-    // 2단계: API 키가 있고 2글자 이상인 경우 식약처 API 비동기 검색
-    const apiKey = state.userData.apiKey;
-    if (apiKey && query.length >= 2) {
-      // 검색 중 로딩 인디케이터 표시
-      const loadingEl = document.createElement('div');
-      loadingEl.className = 'autocomplete-item';
-      loadingEl.style.color = 'var(--color-secondary)';
-      loadingEl.style.fontSize = '0.8rem';
-      loadingEl.style.borderTop = '1px solid var(--border-color)';
-      loadingEl.textContent = '🔄 식약처 실시간 데이터 조회 중...';
-      listEl.appendChild(loadingEl);
-      
-      try {
-        const targetUrl = `https://openapi.foodsafetykorea.go.kr/api/${apiKey}/I2790/json/1/10/DESC_KOR=${encodeURIComponent(query)}`;
-        // 브라우저의 CORS 보안 제한을 해제하기 위해 공인 CORS Proxy(AllOrigins)를 활용합니다.
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
-        const response = await fetch(proxyUrl);
-        const wrapper = await response.json();
-        
-        // 프록시 서버는 결과를 wrapper.contents에 문자열 형태로 담아 보내줍니다.
-        if (!wrapper || !wrapper.contents) {
-          throw new Error('API wrapper contents are empty');
-        }
-        
-        const data = JSON.parse(wrapper.contents);
-        
-        if (data.I2790 && data.I2790.row) {
-          const apiMatches = data.I2790.row.map(row => {
-            const calories = parseFloat(row.NUTR_CONT1) || 0;
-            const carbs = parseFloat(row.NUTR_CONT2) || 0;
-            const protein = parseFloat(row.NUTR_CONT3) || 0;
-            const fat = parseFloat(row.NUTR_CONT4) || 0;
-            const serving = parseFloat(row.SERVING_SIZE) || 100;
-            
-            const nameSuffix = row.MAKR_NAME ? ` [${row.MAKR_NAME}]` : '';
-            
-            return {
-              name: `${row.DESC_KOR}${nameSuffix}`,
-              calories: calories,
-              carbs: carbs,
-              protein: protein,
-              fat: fat,
-              defaultServing: serving,
-              unit: 'g',
-              category: 'api'
-            };
-          });
-          
-          // 중복 제거 후 병합
-          apiMatches.forEach(apiFood => {
-            if (!allMatches.some(f => f.name === apiFood.name)) {
-              allMatches.push(apiFood);
-            }
-          });
-        }
-      } catch (err) {
-        console.error('식약처 API 호출 에러:', err);
-      }
-      
-      // 최종 결합 데이터로 다시 렌더링
-      renderAutocomplete(allMatches, listEl, categoryKo);
-    }
-  }, 350);
-}
-
-// 자동완성 UI 렌더링 헬퍼 함수
-function renderAutocomplete(matches, listEl, categoryKo) {
+  // 로컬 DB에서 매칭되는 식품 12개까지 추출
+  const matches = FOOD_DATABASE.filter(food => food.name.toLowerCase().includes(query)).slice(0, 12);
+  
   if (matches.length === 0) {
     listEl.innerHTML = '<div class="autocomplete-item" style="color: var(--color-text-muted);">검색 결과가 없습니다.</div>';
     listEl.style.display = 'block';
     return;
   }
+  
+  const categoryKo = {
+    fitness: '피트니스',
+    convenience: '편의점',
+    franchise: '프랜차이즈',
+    restaurant: '일반외식'
+  };
   
   listEl.innerHTML = '';
   matches.forEach(food => {
