@@ -486,6 +486,7 @@ chineseShops.forEach(shop => {
         Math.round(cal * ratio),
         Math.round(carb * ratio * 10) / 10,
         Math.round(prot * ratio * 10) / 10,
+        Math.round(fat * ratio * 10) / 10,
         menu.includes("꼬치") ? "개" : "인분", 1, "restaurant"
       ]);
     });
@@ -527,6 +528,7 @@ cafeBrands.forEach(brand => {
         Math.round(cal * finalRatio),
         Math.round(carb * finalRatio * 10) / 10,
         Math.round(prot * finalRatio * 10) / 10,
+        Math.round(fat * finalRatio * 10) / 10,
         (!menu.includes("케이크") && !menu.includes("베이글") && !menu.includes("크로플")) ? "잔" : "개", 1, "convenience"
       ]);
     });
