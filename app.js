@@ -380,7 +380,7 @@ function addSelectedFood() {
   }
   
   if (amount <= 0) {
-    alert('섭취량을 1 이상 입력해 주세요.');
+    alert('섭취량을 0보다 크게 입력해 주세요.');
     return;
   }
   
