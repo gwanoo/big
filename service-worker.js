@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lmu-tracker-v4';
+const CACHE_NAME = 'lmu-tracker-v5';
 const ASSETS = [
   './',
   './index.html',

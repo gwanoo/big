@@ -1,3 +1,20 @@
+// Firebase configuration (Placeholder)
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+// Firebase 초기화
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
+const auth = firebase.auth();
+
 // 상태 전역 변수
 let state = {
   currentDate: '',
@@ -13,6 +30,12 @@ let state = {
   },
   dailyLogs: {} // 날짜별 데이터: { 'YYYY-MM-DD': { diet: [], workout: [], workoutSplit: '' } }
 };
+
+// 파이어베이스 인증 & 소셜 상태 변수
+let currentUser = null;
+let allUsers = [];
+let selectedUserForLogin = null;
+let activeListeners = {};
 
 // 분할별 추천 운동 데이터
 const SPLIT_RECOMMENDATIONS = {
@@ -54,10 +77,8 @@ let selectedFoodFromDb = null;
 // 초기화
 document.addEventListener('DOMContentLoaded', () => {
   initDate();
-  loadLocalStorage();
   setupEventListeners();
-  calculateRecommendedMacros();
-  updateUI();
+  initAuth();
   registerServiceWorker();
 });
 
@@ -86,34 +107,232 @@ function initDate() {
   dateInput.value = formattedToday;
 }
 
-// LocalStorage 데이터 로드
-function loadLocalStorage() {
-  const savedState = localStorage.getItem('leanMassUpTrackerState');
-  if (savedState) {
-    try {
-      const parsed = JSON.parse(savedState);
-      if (parsed.userData) state.userData = parsed.userData;
-      if (parsed.dailyLogs) state.dailyLogs = parsed.dailyLogs;
-    } catch (e) {
-      console.error('LocalStorage 파싱 오류:', e);
+// Firebase 인증 & 닉네임 목록 동적 로드 초기화
+function initAuth() {
+  // 1. 실시간 닉네임 목록 수신
+  db.collection('users').onSnapshot(snapshot => {
+    allUsers = [];
+    snapshot.forEach(doc => {
+      allUsers.push({ id: doc.id, ...doc.data() });
+    });
+    renderLoginCards();
+    updateSocialLeaderboard(); // 경쟁 탭 갱신
+  }, err => {
+    console.error("유저 목록 로드 에러 (Firebase Config 설정 확인 필요):", err);
+    // Firebase Config 미등록 시 더미 랭킹 지원 (로컬 프리뷰용)
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+      allUsers = [
+        { id: "dummy1", name: "득근맨", pin: "1234", weight: 75, targets: { calories: 2400, carbs: 300, protein: 150, fat: 60 } },
+        { id: "dummy2", name: "3대500", pin: "1234", weight: 80, targets: { calories: 2600, carbs: 320, protein: 160, fat: 65 } }
+      ];
+      renderLoginCards();
     }
+  });
+
+  // 2. 자동 로그인 세션 감지
+  const savedUserId = localStorage.getItem('lmu_current_user_id');
+  if (savedUserId) {
+    db.collection('users').doc(savedUserId).get().then(doc => {
+      if (doc.exists) {
+        loginAsUser({ id: doc.id, ...doc.data() });
+      } else {
+        localStorage.removeItem('lmu_current_user_id');
+        showLoginOverlay(true);
+      }
+    }).catch(() => {
+      showLoginOverlay(true);
+    });
+  } else {
+    showLoginOverlay(true);
   }
-  
-  // 현재 날짜 로그 없으면 빈 객체로 생성
-  ensureCurrentDateLog();
-  
-  // 입력 폼에 설정값 채우기
-  document.getElementById('user-weight').value = state.userData.weight;
-  document.getElementById('user-activity').value = state.userData.activity;
-  document.getElementById('target-calories').value = state.userData.targets.calories;
-  document.getElementById('target-carbs').value = state.userData.targets.carbs;
-  document.getElementById('target-protein').value = state.userData.targets.protein;
-  document.getElementById('target-fat').value = state.userData.targets.fat;
 }
 
-// LocalStorage에 상태 저장
+// 로그인 오버레이 노출/은폐
+function showLoginOverlay(show) {
+  const overlay = document.getElementById('login-overlay');
+  overlay.style.display = show ? 'flex' : 'none';
+}
+
+// 닉네임 그리드 렌더링
+function renderLoginCards() {
+  const cardsContainer = document.getElementById('login-cards');
+  cardsContainer.innerHTML = '';
+  
+  if (allUsers.length === 0) {
+    cardsContainer.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--color-text-muted); font-size: 0.9rem; padding: 1rem 0;">등록된 멤버가 없습니다. 아래에서 새로 등록해 주세요!</div>';
+    return;
+  }
+  
+  allUsers.forEach(user => {
+    const card = document.createElement('div');
+    card.className = 'login-user-card';
+    card.innerHTML = `
+      <div class="avatar">${user.name.charAt(0)}</div>
+      <div class="username">${user.name}</div>
+    `;
+    card.addEventListener('click', () => {
+      promptPin(user);
+    });
+    cardsContainer.appendChild(card);
+  });
+}
+
+// PIN 번호 입력 프롬프트 모달
+function promptPin(user) {
+  selectedUserForLogin = user;
+  document.getElementById('pin-modal-title').textContent = `[${user.name}] 비밀번호 입력`;
+  document.getElementById('login-pin-input').value = '';
+  document.getElementById('pin-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('login-pin-input').focus(), 100);
+}
+
+function closePinModal() {
+  document.getElementById('pin-modal').style.display = 'none';
+  selectedUserForLogin = null;
+}
+
+// PIN 확인 제출
+function submitPin() {
+  const pinInput = document.getElementById('login-pin-input').value.trim();
+  if (!selectedUserForLogin) return;
+  
+  if (pinInput === selectedUserForLogin.pin) {
+    loginAsUser(selectedUserForLogin);
+    closePinModal();
+  } else {
+    alert('비밀번호 4자리가 올바르지 않습니다.');
+    document.getElementById('login-pin-input').value = '';
+    document.getElementById('login-pin-input').focus();
+  }
+}
+
+// 신규 멤버 등록 및 로그인
+function registerNewMember() {
+  const name = document.getElementById('reg-name').value.trim();
+  const pin = document.getElementById('reg-pin').value.trim();
+  const weight = parseFloat(document.getElementById('reg-weight').value) || 70;
+  
+  if (name.length < 2 || name.length > 8) {
+    alert('닉네임은 2자 이상 8자 이하로 입력해 주세요.');
+    return;
+  }
+  if (!/^\d{4}$/.test(pin)) {
+    alert('PIN 비밀번호는 숫자 4자리로 입력해 주세요.');
+    return;
+  }
+  
+  // 중복 닉네임 체크
+  const isDuplicate = allUsers.some(u => u.name.toLowerCase() === name.toLowerCase());
+  if (isDuplicate) {
+    alert('이미 사용 중인 닉네임입니다. 다른 닉네임을 사용해 주세요.');
+    return;
+  }
+
+  // 익명 인증 후 문서 생성
+  auth.signInAnonymously().then(cred => {
+    const uid = cred.user.uid;
+    
+    // 체중에 따른 기초 타겟 계산
+    const targetCal = Math.round((10 * weight + 6.25 * 175 - 5 * 28 + 5) * 1.375) + 150;
+    const targetProtein = Math.round(weight * 2.0);
+    const targetFat = Math.round((targetCal * 0.22) / 9);
+    const targetCarb = Math.round((targetCal - (targetProtein * 4) - (targetFat * 9)) / 4);
+
+    const newUser = {
+      name: name,
+      pin: pin,
+      weight: weight,
+      activity: 1.375,
+      targets: {
+        calories: targetCal,
+        carbs: targetCarb,
+        protein: targetProtein,
+        fat: targetFat
+      }
+    };
+
+    db.collection('users').doc(uid).set(newUser).then(() => {
+      document.getElementById('reg-name').value = '';
+      document.getElementById('reg-pin').value = '';
+      loginAsUser({ id: uid, ...newUser });
+    });
+  }).catch(err => {
+    console.error("멤버 등록 오류:", err);
+    alert('파이어베이스 연동 오류가 발생했습니다. Config 설정과 Firestore 보안 규칙이 [테스트 모드]인지 대조해 주세요.');
+  });
+}
+
+// 실제 사용자 상태 세팅 및 데이터 바인딩
+function loginAsUser(user) {
+  currentUser = user;
+  localStorage.setItem('lmu_current_user_id', user.id);
+  showLoginOverlay(false);
+  
+  // 프로필 배지 표시
+  document.getElementById('active-user-badge').textContent = `👤 ${user.name}`;
+  document.getElementById('active-user-badge').style.display = 'inline-block';
+  document.getElementById('logout-btn').style.display = 'inline-block';
+  
+  // 상태 변수에 유저 데이터 복사
+  state.userData = {
+    weight: user.weight,
+    activity: user.activity || 1.375,
+    targets: user.targets
+  };
+  
+  // 설정 폼 초기값 채우기
+  document.getElementById('user-weight').value = user.weight;
+  document.getElementById('user-activity').value = user.activity || 1.375;
+  document.getElementById('target-calories').value = user.targets.calories;
+  document.getElementById('target-carbs').value = user.targets.carbs;
+  document.getElementById('target-protein').value = user.targets.protein;
+  document.getElementById('target-fat').value = user.targets.fat;
+  
+  // 일일 로그 실시간 수신 리스너 구축
+  setupRealtimeDailyLog();
+  calculateRecommendedMacros();
+}
+
+// 로그아웃
+function logout() {
+  localStorage.removeItem('lmu_current_user_id');
+  window.location.reload();
+}
+
+// 특정 일자 로그 실시간 Firestore 바인딩
+function setupRealtimeDailyLog() {
+  if (!currentUser) return;
+  
+  // 기존 일일 리스너 해제
+  if (activeListeners['daily_log']) {
+    activeListeners['daily_log']();
+  }
+  
+  const docId = `${currentUser.id}_${state.currentDate}`;
+  activeListeners['daily_log'] = db.collection('dailyLogs').doc(docId).onSnapshot(doc => {
+    if (doc.exists) {
+      state.dailyLogs[state.currentDate] = doc.data();
+    } else {
+      // 신규 날짜 빈 템플릿 생성
+      state.dailyLogs[state.currentDate] = {
+        diet: [],
+        workout: [],
+        workoutSplit: ''
+      };
+    }
+    updateUI();
+  }, err => {
+    console.error("일일 로그 바인딩 오류:", err);
+  });
+}
+
+// Firestore에 현재 날짜의 로그 백업
 function saveState() {
-  localStorage.setItem('leanMassUpTrackerState', JSON.stringify(state));
+  if (!currentUser) return;
+  ensureCurrentDateLog();
+  const docId = `${currentUser.id}_${state.currentDate}`;
+  db.collection('dailyLogs').doc(docId).set(state.dailyLogs[state.currentDate])
+    .catch(err => console.error("Firestore 저장 실패:", err));
 }
 
 // 현재 날짜의 로그 구조가 있는지 보장
@@ -132,8 +351,7 @@ function setupEventListeners() {
   // 날짜 변경 이벤트
   document.getElementById('current-date').addEventListener('change', (e) => {
     state.currentDate = e.target.value;
-    ensureCurrentDateLog();
-    updateUI();
+    setupRealtimeDailyLog(); // Firebase 리스너 결합 및 UI 갱신 자동 트리거
   });
   
   // 식품 검색 자동완성 이벤트
@@ -199,14 +417,40 @@ function calculateRecommendedMacros() {
 
 // 타겟 직접 지정 저장
 function saveTargetSettings() {
-  state.userData.targets.calories = parseInt(document.getElementById('target-calories').value) || 2200;
-  state.userData.targets.carbs = parseInt(document.getElementById('target-carbs').value) || 275;
-  state.userData.targets.protein = parseInt(document.getElementById('target-protein').value) || 140;
-  state.userData.targets.fat = parseInt(document.getElementById('target-fat').value) || 54;
+  const calories = parseInt(document.getElementById('target-calories').value) || 2200;
+  const carbs = parseInt(document.getElementById('target-carbs').value) || 275;
+  const protein = parseInt(document.getElementById('target-protein').value) || 140;
+  const fat = parseInt(document.getElementById('target-fat').value) || 54;
+  const weight = parseFloat(document.getElementById('user-weight').value) || 70;
+  const activity = parseFloat(document.getElementById('user-activity').value) || 1.375;
+
+  state.userData.targets.calories = calories;
+  state.userData.targets.carbs = carbs;
+  state.userData.targets.protein = protein;
+  state.userData.targets.fat = fat;
+  state.userData.weight = weight;
+  state.userData.activity = activity;
   
-  saveState();
-  updateUI();
-  alert('설정이 저장되었습니다.');
+  if (currentUser) {
+    db.collection('users').doc(currentUser.id).update({
+      weight: weight,
+      activity: activity,
+      targets: state.userData.targets
+    }).then(() => {
+      currentUser.weight = weight;
+      currentUser.activity = activity;
+      currentUser.targets = state.userData.targets;
+      updateUI();
+      alert('설정이 클라우드에 성공적으로 백업되었습니다! 💾');
+    }).catch(err => {
+      console.error("클라우드 설정 동기화 실패:", err);
+      updateUI();
+      alert('설정이 저장되었습니다 (오프라인).');
+    });
+  } else {
+    updateUI();
+    alert('설정이 로컬에 임시 저장되었습니다.');
+  }
 }
 
 // UI 전체 업데이트
@@ -214,6 +458,7 @@ function updateUI() {
   updateDashboard();
   updateDietList();
   updateWorkoutSection();
+  updateSocialLeaderboard(); // 경쟁 현황판도 갱신
 }
 
 // 1. 대시보드 정보 갱신
@@ -697,4 +942,141 @@ function updateWorkoutSet(workoutIdx, setIdx, field, value) {
     saveState();
     updateDashboard(); // 상단 대시보드 갱신
   }
+}
+
+// ====================================================================
+// Firebase Realtime Social Leaderboard
+// ====================================================================
+let socialLogsListener = null;
+
+function updateSocialLeaderboard() {
+  const leaderboardEl = document.getElementById('social-leaderboard');
+  if (!leaderboardEl) return;
+  
+  if (!currentUser) {
+    leaderboardEl.innerHTML = '<div style="text-align: center; color: var(--color-text-muted); padding: 2rem 0;">로그인 후 경쟁 현황을 확인하실 수 있습니다.</div>';
+    return;
+  }
+
+  if (socialLogsListener) {
+    socialLogsListener();
+    socialLogsListener = null;
+  }
+
+  const today = state.currentDate;
+  
+  // dailyLogs 컬렉션에서 실시간 데이터 감지
+  socialLogsListener = db.collection('dailyLogs')
+    .onSnapshot(snapshot => {
+      const logsMap = {};
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const docId = doc.id;
+        const underscoreIdx = docId.lastIndexOf('_');
+        if (underscoreIdx !== -1) {
+          const userId = docId.substring(0, underscoreIdx);
+          const logDate = docId.substring(underscoreIdx + 1);
+          if (logDate === today) {
+            logsMap[userId] = data;
+          }
+        }
+      });
+
+      const leaderboardData = allUsers.map(user => {
+        const userLog = logsMap[user.id] || { diet: [], workout: [], workoutSplit: '' };
+        
+        let totalCal = 0;
+        let totalProtein = 0;
+        if (userLog.diet) {
+          userLog.diet.forEach(d => {
+            totalCal += d.calories || 0;
+            totalProtein += d.protein || 0;
+          });
+        }
+        
+        let totalSets = 0;
+        if (userLog.workout) {
+          userLog.workout.forEach(w => {
+            totalSets += (w.sets ? w.sets.length : 0);
+          });
+        }
+        
+        const targetCal = user.targets ? user.targets.calories : 2200;
+        const calPercent = targetCal > 0 ? Math.min(150, Math.round((totalCal / targetCal) * 100)) : 0;
+        
+        return {
+          id: user.id,
+          name: user.name,
+          totalCal: Math.round(totalCal),
+          targetCal: targetCal,
+          calPercent: calPercent,
+          totalProtein: Math.round(totalProtein),
+          targetProtein: user.targets ? user.targets.protein : 140,
+          totalSets: totalSets,
+          workoutSplit: userLog.workoutSplit || ''
+        };
+      });
+
+      // 칼로리 달성도 기준 정렬
+      leaderboardData.sort((a, b) => b.calPercent - a.calPercent);
+
+      leaderboardEl.innerHTML = '';
+      if (leaderboardData.length === 0) {
+        leaderboardEl.innerHTML = '<div style="text-align: center; color: var(--color-text-muted); padding: 1.5rem 0;">경쟁에 참여 중인 유저가 없습니다.</div>';
+        return;
+      }
+
+      leaderboardData.forEach((user, index) => {
+        const rank = index + 1;
+        const isSelf = user.id === currentUser.id;
+        
+        const card = document.createElement('div');
+        card.className = `social-user-card rank-${rank > 3 ? 'etc' : rank}`;
+        if (isSelf) {
+          card.style.borderLeft = '4px solid var(--color-secondary)';
+        }
+        
+        const splitTextMap = {
+          'chest-triceps': '가슴 & 삼두',
+          'back-biceps': '등 & 이두',
+          'legs-shoulders': '하체 & 어깨'
+        };
+        const splitText = splitTextMap[user.workoutSplit] ? `🏋️‍♂️ ${splitTextMap[user.workoutSplit]} 진행 중` : '😴 휴식 중';
+        const workoutCompleted = user.totalSets > 0;
+        
+        card.innerHTML = `
+          <div class="social-user-header">
+            <div class="social-user-info">
+              <span class="social-rank-badge">${rank}</span>
+              <span class="social-username">${user.name} ${isSelf ? '<small style="color: var(--color-secondary);">(나)</small>' : ''}</span>
+            </div>
+            <div class="social-workout-status">
+              ${workoutCompleted 
+                ? `<span class="workout-completed-badge">🔥 ${user.totalSets}세트 완료</span>` 
+                : `<span style="font-size: 0.8rem; color: var(--color-text-muted);">${splitText}</span>`}
+            </div>
+          </div>
+          
+          <div class="social-user-stats">
+            <div class="social-gauge-container">
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--color-text-muted);">
+                <span>칼로리 달성도</span>
+                <span>${user.totalCal} / ${user.targetCal} kcal (${user.calPercent}%)</span>
+              </div>
+              <div class="progress-bar-bg" style="height: 8px;">
+                <div class="progress-bar-fill fill-cal" style="width: ${user.calPercent}%"></div>
+              </div>
+            </div>
+            
+            <div style="font-size: 0.85rem; color: var(--color-text-muted); display: flex; justify-content: space-between; align-items: center;">
+              <span>단백질 섭취</span>
+              <strong style="color: var(--color-text-main);">${user.totalProtein}g / ${user.targetProtein}g</strong>
+            </div>
+          </div>
+        `;
+        leaderboardEl.appendChild(card);
+      });
+    }, err => {
+      console.error("소셜 리더보드 로딩 에러:", err);
+    });
 }

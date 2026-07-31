@@ -16,11 +16,14 @@
     <div class="logo">
       <span class="logo-icon">⚡</span>
       <span>Lean Mass Up Tracker</span>
+      <span id="active-user-badge" class="badge" style="display: none; margin-left: 0.5rem; background-color: var(--color-primary); color: #000; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 4px;"></span>
+      <button id="logout-btn" style="display: none; background: none; border: none; color: var(--color-text-muted); font-size: 0.75rem; cursor: pointer; margin-left: 0.5rem; text-decoration: underline;" onclick="logout()">로그아웃</button>
     </div>
     <nav>
       <button class="nav-btn active" onclick="switchTab('dashboard')">대시보드</button>
       <button class="nav-btn" onclick="switchTab('diet')">식단 기록</button>
       <button class="nav-btn" onclick="switchTab('workout')">운동 기록</button>
+      <button class="nav-btn" onclick="switchTab('social')">경쟁 현황 👥</button>
       <button class="nav-btn" onclick="switchTab('settings')">설정 & 가이드</button>
     </nav>
   </header>
@@ -381,13 +384,80 @@
         </div>
       </div>
     </section>
+
+    <!-- 4. 경쟁 현황 탭 -->
+    <section id="social" class="tab-content">
+      <div class="alert-box">
+        <span class="alert-box-icon">🔥</span>
+        <div>
+          <strong>오늘의 린매스업 경쟁 현황:</strong> 그룹원들의 오늘의 칼로리/단백질 목표 달성률과 운동 진행 현황을 실시간으로 중계합니다. 서로 자극을 받으며 득근하세요!
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">오늘의 린매스업 실시간 리더보드</div>
+        <div id="social-leaderboard" class="social-list">
+          <!-- JS로 동적 주입 -->
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer style="text-align: center; padding: 2rem; color: var(--color-text-muted); font-size: 0.8rem; border-top: 1px solid var(--border-color); background-color: var(--bg-secondary); margin-top: auto;">
     <p>&copy; 2026 Lean Mass Up Tracker. 8.1 헬스 재개 및 린매스업 완성을 응원합니다!</p>
   </footer>
 
-  <script src="foodDb.js?v=1.4"></script>
-  <script src="app.js?v=1.4"></script>
+  <!-- 로그인 오버레이 -->
+  <div id="login-overlay" class="login-overlay" style="display: flex;">
+    <div class="login-card-container">
+      <h2 style="margin-bottom: 0.5rem; text-align: center; color: var(--color-primary);">⚡ 린매스업 트래커</h2>
+      <p style="color: var(--color-text-muted); font-size: 0.9rem; text-align: center; margin-bottom: 2rem;">등록된 닉네임 카드를 누르고 PIN 비밀번호를 입력해 주세요.</p>
+      
+      <!-- 닉네임 카드 그리드 -->
+      <div id="login-cards" class="login-grid">
+        <!-- JS로 동적 로드 -->
+      </div>
+      
+      <!-- 신규 닉네임 등록 폼 -->
+      <div id="register-section" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+        <h4 style="margin-bottom: 1rem; color: var(--color-text-main);">[+ 새 멤버 등록 (닉네임 설정)]</h4>
+        <div class="form-group">
+          <label for="reg-name" style="font-size: 0.8rem; margin-bottom: 0.3rem;">닉네임 (2~8자)</label>
+          <input type="text" id="reg-name" placeholder="닉네임 입력 (예: 득근맨)">
+        </div>
+        <div class="form-group">
+          <label for="reg-pin" style="font-size: 0.8rem; margin-bottom: 0.3rem;">PIN 비밀번호 (숫자 4자리)</label>
+          <input type="password" id="reg-pin" placeholder="PIN 번호 4자리 입력" maxlength="4" pattern="[0-9]*" inputmode="numeric">
+        </div>
+        <div class="form-group">
+          <label for="reg-weight" style="font-size: 0.8rem; margin-bottom: 0.3rem;">현재 체중 (kg) - 목표 설정용</label>
+          <input type="number" id="reg-weight" placeholder="현재 체중 입력 (예: 75)" value="75">
+        </div>
+        <button class="btn" style="width: 100%; margin-top: 0.5rem;" onclick="registerNewMember()">등록 및 자동 로그인 🚀</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN 비밀번호 입력 모달 -->
+  <div id="pin-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="max-width: 320px; text-align: center;">
+      <h3 id="pin-modal-title" style="margin-bottom: 1rem;">비밀번호 입력</h3>
+      <div class="form-group">
+        <input type="password" id="login-pin-input" placeholder="비밀번호 4자리" maxlength="4" pattern="[0-9]*" inputmode="numeric" style="font-size: 1.5rem; text-align: center; letter-spacing: 0.5rem; background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--color-text-main);">
+      </div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 1.5rem;">
+        <button class="btn btn-secondary" style="flex: 1;" onclick="closePinModal()">취소</button>
+        <button class="btn" style="flex: 1;" onclick="submitPin()">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK 호환버전 (Compat) 로드 -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <script src="foodDb.js?v=1.5"></script>
+  <script src="app.js?v=1.5"></script>
 </body>
 </html>
