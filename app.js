@@ -567,8 +567,8 @@ function handleFoodSearch(e) {
     return;
   }
   
-  // 로컬 DB에서 매칭되는 식품 12개까지 추출
-  const matches = FOOD_DATABASE.filter(food => food.name.toLowerCase().includes(query)).slice(0, 12);
+  // 로컬 DB에서 매칭되는 식품 전체 추출 (스크롤로 100% 탐색 가능)
+  const matches = FOOD_DATABASE.filter(food => food.name.toLowerCase().includes(query));
   
   if (matches.length === 0) {
     listEl.innerHTML = '<div class="autocomplete-item" style="color: var(--color-text-muted);">검색 결과가 없습니다.</div>';
