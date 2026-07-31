@@ -1,11 +1,11 @@
-// Firebase configuration (Placeholder)
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyA9eZMLqfwd-7-dlY3YRG2GowjyJEcKjR8",
+  authDomain: "lean-mass-up-3b73a.firebaseapp.com",
+  projectId: "lean-mass-up-3b73a",
+  storageBucket: "lean-mass-up-3b73a.firebasestorage.app",
+  messagingSenderId: "264922643636",
+  appId: "1:264922643636:web:b6e9eb413ae6dd81aaabe1"
 };
 
 // Firebase 초기화
