@@ -92,18 +92,26 @@
             </div>
           </div>
 
-          <div class="macro-grid">
+          <div class="macro-grid" style="grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));">
             <div class="macro-box">
-              <div style="font-size: 0.8rem; color: var(--color-text-muted);">탄수화물 섭취</div>
+              <div style="font-size: 0.8rem; color: var(--color-text-muted);">탄수화물</div>
               <div class="macro-val" id="macro-carb">0 g</div>
             </div>
             <div class="macro-box" style="border-color: rgba(255, 45, 85, 0.3);">
-              <div style="font-size: 0.8rem; color: var(--color-text-muted);">단백질 섭취</div>
-              <div class="macro-val" id="macro-protein" style="color: #ff2d55;">0 g</div>
+              <div style="font-size: 0.8rem; color: var(--color-text-muted);">단백질</div>
+              <div class="macro-val" id="macro-protein" style="color: var(--color-secondary);">0 g</div>
             </div>
             <div class="macro-box">
-              <div style="font-size: 0.8rem; color: var(--color-text-muted);">지방 섭취</div>
+              <div style="font-size: 0.8rem; color: var(--color-text-muted);">지방</div>
               <div class="macro-val" id="macro-fat">0 g</div>
+            </div>
+            <div class="macro-box" style="border-color: rgba(255, 149, 0, 0.3);">
+              <div style="font-size: 0.8rem; color: #ff9500;">🔥 소모 칼로리</div>
+              <div class="macro-val" id="macro-burned" style="color: #ff9500;">0 kcal</div>
+            </div>
+            <div class="macro-box" style="border-color: rgba(52, 199, 89, 0.3);">
+              <div style="font-size: 0.8rem; color: #34c759;">⚖️ 순 칼로리</div>
+              <div class="macro-val" id="macro-net" style="color: #34c759;">0 kcal</div>
             </div>
           </div>
         </div>
@@ -285,13 +293,53 @@
             </div>
           </div>
 
-          <div id="workout-list-empty" style="text-align: center; padding: 3rem 0; color: var(--color-text-muted);">
-            <p>오늘 등록한 운동 종목이 없습니다.</p>
+          <div id="workout-list-empty" style="text-align: center; padding: 2rem 0; color: var(--color-text-muted);">
+            <p>오늘 등록한 근력 운동 종목이 없습니다.</p>
             <p style="font-size: 0.85rem; margin-top: 0.5rem;">추천 운동을 선택하거나 직접 입력하여 세트를 기록해 보세요.</p>
           </div>
 
           <div id="logged-workouts-container" style="display: none; display: flex; flex-direction: column; gap: 1.5rem;">
             <!-- JS로 운동 항목과 세트 입력 테이블 주입 -->
+          </div>
+        </div>
+
+        <!-- 🏃‍♂️ 유산소 운동 및 소모 칼로리 계산 카드 -->
+        <div class="card" style="margin-top: 1.5rem;">
+          <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+            <span>🏃‍♂️ 유산소 운동 & 소모 칼로리</span>
+            <span id="total-cardio-burned-tag" style="font-size: 0.85rem; color: #ff9500; font-weight: 700;">오늘 유산소 소모: 0 kcal</span>
+          </div>
+
+          <div class="form-row" style="align-items: flex-end; margin-bottom: 1.2rem;">
+            <div class="form-group" style="flex: 2;">
+              <label for="cardio-type-select">유산소 운동 종목 선택</label>
+              <select id="cardio-type-select">
+                <option value="running-8" data-met="8.0">🏃‍♂️ 러닝 / 조깅 (8km/h)</option>
+                <option value="running-10" data-met="10.0">⚡ 고속 러닝 (10km/h)</option>
+                <option value="cycle-mid" data-met="6.8">🚴‍♂️ 실내 싸이클 (중강도)</option>
+                <option value="cycle-outdoor" data-met="7.5">🚵‍♂️ 야외 자전거 타기</option>
+                <option value="stairmaster" data-met="9.0">🧗‍♂️ 천국의 계단 (스텝밀)</option>
+                <option value="rope" data-met="11.0">🪢 줄넘기</option>
+                <option value="swimming" data-met="8.0">🏊‍♂️ 수영 (자유형)</option>
+                <option value="incline-walk" data-met="6.0">🚶‍♂️ 경사로 트레드밀 걷기 (인클라인)</option>
+                <option value="walk" data-met="3.8">🚶‍♀️ 일반 산책 / 걷기</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label for="cardio-minutes-input">운동 시간 (분)</label>
+              <input type="number" id="cardio-minutes-input" placeholder="30" value="30" min="1" max="600">
+            </div>
+            <div style="margin-bottom: 1.2rem;">
+              <button class="btn" onclick="addCardioWorkoutItem()" style="background: linear-gradient(135deg, #ff9500, #ff5e00);">+ 유산소 추가</button>
+            </div>
+          </div>
+
+          <div id="cardio-list-empty" style="text-align: center; padding: 1.5rem 0; color: var(--color-text-muted); border: 1px dashed var(--border-color); border-radius: 8px;">
+            오늘 등록한 유산소 운동이 없습니다.
+          </div>
+
+          <div id="logged-cardio-container" style="display: none; display: flex; flex-direction: column; gap: 0.8rem;">
+            <!-- JS로 유산소 리스트 항목 주입 -->
           </div>
         </div>
       </div>
@@ -457,7 +505,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
-  <script src="foodDb.js?v=2.4"></script>
-  <script src="app.js?v=2.4"></script>
+  <script src="foodDb.js?v=2.5"></script>
+  <script src="app.js?v=2.5"></script>
 </body>
 </html>

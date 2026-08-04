@@ -317,6 +317,7 @@ function setupRealtimeDailyLog() {
       state.dailyLogs[state.currentDate] = {
         diet: [],
         workout: [],
+        cardio: [],
         workoutSplit: ''
       };
     }
@@ -341,6 +342,7 @@ function ensureCurrentDateLog() {
     state.dailyLogs[state.currentDate] = {
       diet: [],
       workout: [],
+      cardio: [],
       workoutSplit: ''
     };
   }
@@ -458,6 +460,7 @@ function updateUI() {
   updateDashboard();
   updateDietList();
   updateWorkoutSection();
+  updateCardioSection();
   updateSocialLeaderboard(); // 경쟁 현황판도 갱신
 }
 
@@ -500,10 +503,31 @@ function updateDashboard() {
   document.getElementById('progress-protein-bar').style.width = `${targets.protein > 0 ? Math.min(100, (totalProtein / targets.protein) * 100) : 0}%`;
   document.getElementById('progress-fat-bar').style.width = `${targets.fat > 0 ? Math.min(100, (totalFat / targets.fat) * 100) : 0}%`;
   
+  // 운동 소모 칼로리 연산 (유산소 + 근력 세트 추정)
+  let totalBurned = 0;
+  if (todayLog.cardio && Array.isArray(todayLog.cardio)) {
+    todayLog.cardio.forEach(c => totalBurned += (c.burnedCal || 0));
+  }
+  if (todayLog.workout && Array.isArray(todayLog.workout)) {
+    todayLog.workout.forEach(w => {
+      if (w.sets) {
+        w.sets.forEach(s => totalBurned += Math.round((s.weight * s.reps) * 0.015 + 10));
+      }
+    });
+  }
+  totalBurned = Math.round(totalBurned);
+  const netCalories = Math.max(0, totalCal - totalBurned);
+
   // 하단 미니 박스 값
   document.getElementById('macro-carb').textContent = `${totalCarb} g`;
   document.getElementById('macro-protein').textContent = `${totalProtein} g`;
   document.getElementById('macro-fat').textContent = `${totalFat} g`;
+  
+  const burnedEl = document.getElementById('macro-burned');
+  if (burnedEl) burnedEl.textContent = `${totalBurned} kcal`;
+  
+  const netEl = document.getElementById('macro-net');
+  if (netEl) netEl.textContent = `${netCalories} kcal`;
   
   // 대시보드 운동 요약 업데이트
   const splitTextMap = {
@@ -567,8 +591,12 @@ function handleFoodSearch(e) {
     return;
   }
   
-  // 로컬 DB에서 매칭되는 식품 전체 추출 (스크롤로 100% 탐색 가능)
-  const matches = FOOD_DATABASE.filter(food => food.name.toLowerCase().includes(query));
+  // 로컬 DB에서 매칭되는 식품 전체 추출 (띄어쓰기 무시 100% 매칭 적용)
+  const cleanQuery = query.replace(/\s+/g, '');
+  const matches = FOOD_DATABASE.filter(food => {
+    const cleanName = food.name.toLowerCase().replace(/\s+/g, '');
+    return cleanName.includes(cleanQuery);
+  });
   
   if (matches.length === 0) {
     listEl.innerHTML = '<div class="autocomplete-item" style="color: var(--color-text-muted);">검색 결과가 없습니다.</div>';
@@ -1079,4 +1107,91 @@ function updateSocialLeaderboard() {
     }, err => {
       console.error("소셜 리더보드 로딩 에러:", err);
     });
+}
+
+// ====================================================================
+// Cardio Workout (유산소 운동 & 소모 칼로리 연산)
+// ====================================================================
+
+function addCardioWorkoutItem() {
+  ensureCurrentDateLog();
+  const selectEl = document.getElementById('cardio-type-select');
+  const minutesInput = document.getElementById('cardio-minutes-input');
+  
+  if (!selectEl || !minutesInput) return;
+  
+  const selectedOption = selectEl.options[selectEl.selectedIndex];
+  const name = selectedOption.text;
+  const met = parseFloat(selectedOption.getAttribute('data-met')) || 7.0;
+  const minutes = parseInt(minutesInput.value) || 30;
+  const weight = state.userData.weight || 70;
+  
+  // 칼로리 소모 공식: MET * 3.5 * 체중(kg) / 200 * 시간(분)
+  const burnedCal = Math.round((met * 3.5 * weight / 200) * minutes);
+  
+  if (!state.dailyLogs[state.currentDate].cardio) {
+    state.dailyLogs[state.currentDate].cardio = [];
+  }
+  
+  state.dailyLogs[state.currentDate].cardio.push({
+    id: Date.now().toString(),
+    name: name,
+    minutes: minutes,
+    met: met,
+    burnedCal: burnedCal
+  });
+  
+  saveState();
+  updateUI();
+}
+
+function deleteCardioWorkoutItem(cardioId) {
+  ensureCurrentDateLog();
+  if (state.dailyLogs[state.currentDate].cardio) {
+    state.dailyLogs[state.currentDate].cardio = state.dailyLogs[state.currentDate].cardio.filter(c => c.id !== cardioId);
+    saveState();
+    updateUI();
+  }
+}
+
+function updateCardioSection() {
+  ensureCurrentDateLog();
+  const todayLog = state.dailyLogs[state.currentDate];
+  const cardioList = todayLog.cardio || [];
+  
+  const emptyDiv = document.getElementById('cardio-list-empty');
+  const containerDiv = document.getElementById('logged-cardio-container');
+  const totalTag = document.getElementById('total-cardio-burned-tag');
+  
+  let totalCardioBurned = 0;
+  cardioList.forEach(c => totalCardioBurned += (c.burnedCal || 0));
+  
+  if (totalTag) totalTag.textContent = `오늘 유산소 소모: ${totalCardioBurned} kcal`;
+  
+  if (!emptyDiv || !containerDiv) return;
+  
+  if (cardioList.length === 0) {
+    emptyDiv.style.display = 'block';
+    containerDiv.style.display = 'none';
+  } else {
+    emptyDiv.style.display = 'none';
+    containerDiv.style.display = 'flex';
+    containerDiv.innerHTML = '';
+    
+    cardioList.forEach(c => {
+      const itemCard = document.createElement('div');
+      itemCard.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-secondary); padding: 0.8rem 1rem; border-radius: 8px; border-left: 3px solid #ff9500;';
+      itemCard.innerHTML = `
+        <div>
+          <strong style="color: var(--color-text-main); font-size: 0.95rem;">${c.name}</strong>
+          <span style="font-size: 0.8rem; color: var(--color-text-muted); margin-left: 0.5rem;">⏱️ ${c.minutes}분 수행</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
+          <span style="font-size: 0.9rem; font-weight: 700; color: #ff9500;">🔥 -${c.burnedCal} kcal</span>
+          <button style="background: none; border: none; color: #ff3b30; cursor: pointer; font-size: 1rem; font-weight: bold;" onclick="deleteCardioWorkoutItem('${c.id}')">✕</button>
+        </div>
+      `;
+      containerDiv.appendChild(itemCard);
+    });
+  }
 }
